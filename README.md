@@ -1,5 +1,14 @@
 # Build Stats
 
+
+## Installation
+
+```
+brew install pipenv
+pipenv install
+```
+
+
 ## Using
 
 Run Jupyte Notebook with
