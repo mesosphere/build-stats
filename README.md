@@ -1,2 +1,9 @@
-# build-stats
-A Jupyter Notebook for Jenkins Build Analysis
+# Build Stats
+
+## Using
+
+Run Jupyte Notebook with
+
+```
+AUTH=user:token pipenv run jupyter notebook
+```
