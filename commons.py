@@ -2,6 +2,7 @@ import aiohttp
 import asyncio
 import logging
 import os
+import pandas
 import requests
 
 from collections import Counter
@@ -21,7 +22,7 @@ class JenkinsJob:
         self.__update_build_ids()
         
         # TODO(karsten): Investigate lru_cache
-        self._failed_test_cases_cache = None
+        self._test_cache = None
         
     def __update_build_ids(self):
         path = "https://{}/{}/api/json?pretty=true&allBuilds=true".format(self._base, self._job)
@@ -36,7 +37,9 @@ class JenkinsJob:
         async with session.get(path, auth=self._auth) as resp:
             try:
                 resp.raise_for_status()
-                return await resp.json()
+                build = await resp.json()
+                build['id'] = build_id
+                return build
             except:
                 logger.exception('Could not fetch build %s', build_id)
                 return None
@@ -45,34 +48,32 @@ class JenkinsJob:
         async with aiohttp.ClientSession() as session:
             build_details = [self.grab_test(session, build_id) for build_id in build_ids]
             return await asyncio.gather(*build_details)
-        
-    async def failed_test_cases(self):
-        if self._failed_test_cases_cache is None:
-            logger.info('Downloading %d builds...', len(self._build_ids))
-            build_details = await self.grab_tests(self._build_ids)
-            logger.info('...done.')
-        
-            builds = (build for build in build_details if build is not None)
-            suites = (suite for build in builds for suite in build['suites'])
-            cases = (case for suite in suites for case in suite['cases'])
-            self._failed_test_cases_cache = [case for case in cases
-                                             if case['status'] == 'FAILED' or case['status'] == 'REGRESSION']
 
-        return self._failed_test_cases_cache
-    
+    async def test_dataframe(self):
+        if self._test_cache is not None:
+            return self._test_cache
+
+        logger.info('Downloading %d builds...', len(self._build_ids))
+        build_details = await self.grab_tests(self._build_ids)
+        logger.info('...done.')
+
+        def data_generator():
+            for build in build_details:
+                if build is not None:
+                    for suite in build['suites']:
+                        for case in suite['cases']:
+                            yield (build['id'], case['className'], case['name'], case['status'], case['errorDetails'])
+
+        self._test_cache = pandas.DataFrame(data_generator(), columns=['build_id', 'testsuite', 'testcase', 'status', 'error'])
+            .set_index(['build_id', 'testsuite', 'testcase'])
+        return self._test_cache
+
+    async def unique_fails(self):
+        df = await self.test_dataframe()
+        fail_statuses = ['FAILED', 'REGRESSION']
+        return df[df.status.isin(fail_statuses)].groupby(level=['testsuite', 'testcase']).count()
+
     async def unique_errors(self):
-        errors = (case['errorDetails'] for case in await self.failed_test_cases())
-        return Counter(errors)
-    
-    async def unique_errors_table(self, tablefmt):
-        errors = await self.unique_errors()
-        return tabulate(errors.items(), headers=['Unique Error', 'Count'], tablefmt=tablefmt)
-            
-    async def names(self):
-        names = ('{}:{}'.format(case['className'], case['name']) for case in await self.failed_test_cases())
-        return Counter(names)
-        
-    async def names_table(self, tablefmt):
-        names = await self.names()
-        return tabulate(names.items(), headers=['Test Case', 'Count'], tablefmt=tablefmt)
-
+        df = await self.test_dataframe()
+        fail_statuses = ['FAILED', 'REGRESSION']
+        return df[df.status.isin(fail_statuses)].groupby('error').count()
