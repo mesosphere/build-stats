@@ -1,6 +1,7 @@
 import aiohttp
 import asyncio
 import logging
+import numpy
 import os
 import pandas
 import requests
@@ -12,8 +13,7 @@ logger = logging.getLogger(__name__)
 
 class JenkinsJob:
     
-    def __init__(self, base, job, user, password):
-        self._base = base
+    def __init__(self, job, user, password):
         self._job = job
         self._build_ids = list()
         self._user = user
@@ -25,14 +25,14 @@ class JenkinsJob:
         self._test_cache = None
         
     def __update_build_ids(self):
-        path = "https://{}/{}/api/json?pretty=true&allBuilds=true".format(self._base, self._job)
+        path = "{}/api/json?pretty=true&allBuilds=true".format(self._job)
         self._build_ids = [b['number']
                            for b
                            in requests.get(path, auth=(self._user, self._password)).json()['builds']][1:]
         logger.info('Found %d builds for %s', len(self._build_ids), self._job)
         
     async def grab_test(self, session, build_id):
-        path = "https://{}/{}/{}/testReport/api/json".format(self._base, self._job, build_id)
+        path = "{}/{}/testReport/api/json".format(self._job, build_id)
         # logger.debug('Fetching test %s', path)
         async with session.get(path, auth=self._auth) as resp:
             try:
@@ -62,18 +62,23 @@ class JenkinsJob:
                 if build is not None:
                     for suite in build['suites']:
                         for case in suite['cases']:
-                            yield (build['id'], case['className'], case['name'], case['status'], case['errorDetails'])
+                            yield (build['id'],
+                                   case['className'],
+                                   case['name'],
+                                   case['status'],
+                                   case['errorDetails'],
+                                   numpy.datetime64(suite['timestamp']))
 
-        self._test_cache = pandas.DataFrame(data_generator(), columns=['build_id', 'testsuite', 'testcase', 'status', 'error'])
-            .set_index(['build_id', 'testsuite', 'testcase'])
+        columns = ['build_id', 'testsuite', 'testcase', 'status', 'error', 'timestamp']
+        self._test_cache = pandas.DataFrame(data_generator(), columns=columns).set_index(['build_id', 'testsuite', 'testcase'])
         return self._test_cache
 
     async def unique_fails(self):
         df = await self.test_dataframe()
         fail_statuses = ['FAILED', 'REGRESSION']
-        return df[df.status.isin(fail_statuses)].groupby(level=['testsuite', 'testcase']).count()
+        return df[df.status.isin(fail_statuses)].drop(['timestamp'], axis=1).groupby(level=['testsuite', 'testcase']).count()
 
     async def unique_errors(self):
         df = await self.test_dataframe()
         fail_statuses = ['FAILED', 'REGRESSION']
-        return df[df.status.isin(fail_statuses)].groupby('error').count()
+        return df[df.status.isin(fail_statuses)].drop(['timestamp'], axis=1).groupby('error').count()
