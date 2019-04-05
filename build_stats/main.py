@@ -10,7 +10,6 @@ import os
 import matplotlib.pyplot as plt
 import sys
 from commons import JenkinsJob
-from IPython.display import HTML, display
 
 async def plot(job, output):
     fail_statuses = ['FAILED', 'REGRESSION']

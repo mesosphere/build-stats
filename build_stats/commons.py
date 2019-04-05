@@ -7,7 +7,6 @@ import pandas
 import requests
 
 from collections import Counter
-from tabulate import tabulate
 
 logger = logging.getLogger(__name__)
 
