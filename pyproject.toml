@@ -5,6 +5,9 @@ description = "Aggregates build statistics from Jenkins."
 authors = ["Karsten Jeschkies <k@jeschkies.xyz>"]
 license = "Apache-2.0"
 
+[tool.poetry.scripts]
+build-stats = "build_stats.main:cli"
+
 [tool.poetry.dependencies]
 python = "^3.6"
 click = "^7.0"

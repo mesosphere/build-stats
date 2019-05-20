@@ -6,14 +6,62 @@ logger = logging.getLogger(__name__)
 
 import asyncio
 import click
+import json
 import os
 import matplotlib.pyplot as plt
 import sys
-from commons import JenkinsJob
+from .commons import JenkinsJob
 
-async def plot(job, output):
+@click.group()
+def cli():
+    pass
+
+@cli.command()
+@click.option('--auth', envvar='AUTH', help='<user>:<jenkins token> pair. Can also be passed with env var AUTH.')
+@click.option('--output', type=click.Path(exists=True, file_okay=False), required=True, help='Download location for Jenkins jobs.')
+@click.argument('job')
+def download(auth, output, job):
+    """Downloads the last 99 builds from Jenkins JOB."""
+    user, password = os.environ['AUTH'].split(":")
+
+    loop = asyncio.get_event_loop()
+    j = JenkinsJob(job, user, password)
+    build_details = loop.run_until_complete(j.download())
+
+    # So far we are lazy and first download everything and save it then in a patch.
+    for build in build_details:
+        if build is not None:
+            with open('{}/{}.json'.format(output, build['id']), 'w') as outfile:
+                json.dump(build, outfile)
+
+@cli.command()
+@click.option('--job', type=click.Path(exists=True, file_okay=False), required=True, help='Location of Jenkins job builds.')
+@click.option('--html/--no-html', default=False, help='Print stats as HTML.')
+def analyze(job, html):
+    """Analyzes all builds in job folder."""
+    j = JenkinsJob.load(job)
+
+    loop = asyncio.get_event_loop()
+    tests = loop.run_until_complete(j.unique_fails())
+    errors = loop.run_until_complete(j.unique_errors())
+    if html:
+        print(errors.to_html())
+        print(tests.to_html())
+    else:
+        print(errors)
+        print(tests)
+
+@cli.command()
+@click.option('--job', type=click.Path(exists=True, file_okay=False), required=True, help='Location of Jenkins job builds.')
+@click.option('--output', type=click.Path(exists=False, dir_okay=False), required=True, help='Location of the plot.')
+def timeline(job, output):
+    """Plots a timeline of all builds in job folder and saves the result to output."""
+    j = JenkinsJob.load(job)
+
     fail_statuses = ['FAILED', 'REGRESSION']
-    df = await job.test_dataframe()
+    loop = asyncio.get_event_loop()
+    df = loop.run_until_complete(j.test_dataframe())
+
     ts = df.groupby(level=0).agg({'status': lambda x: x.isin(fail_statuses).any(), 'timestamp': 'max'})
 
     plt.figure(figsize=(20, 3)) 
@@ -22,24 +70,5 @@ async def plot(job, output):
     plt.xlim([ts.timestamp.min(), ts.timestamp.max()])
     plt.savefig(output, format='png')
 
-async def analyze(user, password, job_name, output):
-    job = JenkinsJob(job_name, user, password)
-    tests = await job.unique_fails()
-    print(tests)
-    errors = await job.unique_errors()
-    print(errors)
-    await plot(job, output)
-
-@click.command()
-@click.option('--auth', envvar='AUTH', help='<user>:<jenkins token> pair. Can also be passed with env var AUTH.')
-@click.option('--output', type=click.File('wb'), help='Location for graph PNG file.')
-@click.argument('job')
-def main(auth, output, job):
-    """Analyzes the last 99 builds from Jenkins JOB."""
-    user, password = os.environ['AUTH'].split(":")
-
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(analyze(user, password, job, output))
-
 if __name__ == '__main__':
-    main()
+    cli()
