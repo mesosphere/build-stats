@@ -2,11 +2,6 @@
 
 rm -r loop-* permissive open strict 1.*.png || true
 
-mkdir loop-1.5 
-poetry run build-stats download --output=loop-1.5 "https://jenkins.mesosphere.com/service/jenkins/view/Marathon/job/marathon-sandbox/job/marathon-loop-1.5/"
-poetry run build-stats analyze --job=loop-1.5 --html
-poetry run build-stats timeline --job=loop-1.5 --output=1.5.png
-
 mkdir loop-1.6 
 poetry run build-stats download --output=loop-1.6 "https://jenkins.mesosphere.com/service/jenkins/view/Marathon/job/marathon-sandbox/job/marathon-loop-1.6/"
 poetry run build-stats analyze --job=loop-1.6 --html
@@ -16,6 +11,11 @@ mkdir loop-1.7
 poetry run build-stats download --output=loop-1.7 "https://jenkins.mesosphere.com/service/jenkins/view/Marathon/job/marathon-sandbox/job/marathon-loop-1.7/"
 poetry run build-stats analyze --job=loop-1.7 --html
 poetry run build-stats timeline --job=loop-1.7 --output=1.7.png
+
+mkdir loop-1.8 
+poetry run build-stats download --output=loop-1.8 "https://jenkins.mesosphere.com/service/jenkins/view/Marathon/job/marathon-sandbox/job/marathon-loop-1.8/"
+poetry run build-stats analyze --job=loop-1.8 --html
+poetry run build-stats timeline --job=loop-1.8 --output=1.8.png
 
 mkdir loop-master
 poetry run build-stats download --output=loop-master "https://jenkins.mesosphere.com/service/jenkins/view/Marathon/job/marathon-sandbox/job/marathon-loop-master/"
