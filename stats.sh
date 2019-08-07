@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -x +e -o pipefail
 
 rm -r loop-* permissive open strict 1.*.png || true
 
