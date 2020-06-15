@@ -14,7 +14,7 @@ Python 3.6 is required to run the build stats commands. You can either use [poet
 
 ```
 mkdir loop
-AUTH=<user>:<token> poetry run build_stats --output=loop <jenkins-job-url>
+AUTH=<user>:<token> poetry run build-stats --output=loop <jenkins-job-url>
 ```
 
 or build and use the Docker image
