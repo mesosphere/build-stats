@@ -13,7 +13,8 @@ pipenv install
 Python 3.6 is required to run the build stats commands. You can either use [poetry](https://poetry.eustace.io/)
 
 ```
-AUTH=<user>:<token> poetry run python build_stats/main.py --output=graph.png <jenkins-job-url>
+mkdir loop
+AUTH=<user>:<token> poetry run build_stats --output=loop <jenkins-job-url>
 ```
 
 or build and use the Docker image
